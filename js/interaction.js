@@ -1,50 +1,77 @@
 /**
  * interaction.js
- * Clean pivot-constraint tonearm model. No spring, no bounce.
+ * Pivot-constraint tonearm model with analog scrub behavior.
  *
  * State machine: IDLE → GRABBED → PLACED → IDLE
  *
- * - IDLE:    arm is parked at rest position
- * - GRABBED: pointer down on pivot/headshell, arm tracks pointer in arc
- * - PLACED:  needle on record, playback active, arm syncs to progress
+ * Scrub mode (GRABBED while audio was playing):
+ *   Audio keeps running while the needle is held.
+ *   Position changes are micro-faded (no digital snap).
+ *   Drag velocity modulates playback pitch for analog feel.
+ *   On release → settle to final position, pitch ramps back to 1.0.
  *
- * Transition behavior:
- * - During grab:   transition: none  (arm is instant/direct)
- * - Park on miss:  transition: 0.55s ease-out (single smooth ease, no overshoot)
- * - Sync during playback: transition: none
+ * Fresh drop (GRABBED while IDLE):
+ *   Normal play() from the dropped position.
  */
 
 const Interaction = (() => {
 
-  // ── Arm angle constants (CSS rotate on #tonearm-pivot) ─────────
-  // Arm extends LEFT. negative = tip UP (parked), positive = tip DOWN (inner)
+  // ── Arm angle constants ──────────────────────────────────────────
   const ARM_PARKED_ANGLE = -30;
   const ARM_OUTER_ANGLE  =  -6;
   const ARM_INNER_ANGLE  =  24;
-  // Drag clamping — allow slight overshoot past park/inner for feel
   const ARM_DRAG_MIN = ARM_PARKED_ANGLE - 8;
   const ARM_DRAG_MAX = ARM_INNER_ANGLE  + 8;
 
-  // ── DOM refs ─────────────────────────────────────────────────────
-  let pivot      = null;
-  let platterArea = null;
+  // ── DOM refs ──────────────────────────────────────────────────────
+  let pivot        = null;
+  let platterArea  = null;
   let recordCanvas = null;
 
-  // ── Geometry (refreshed on init + resize) ───────────────────────
+  // ── Geometry ──────────────────────────────────────────────────────
   let pivotCenter  = { x: 0, y: 0 };
   let platCenter   = { x: 0, y: 0 };
   let recordRadius = 0;
   let innerGrooveR = 0;
   let outerGrooveR = 0;
 
-  // ── State ────────────────────────────────────────────────────────
-  let state = 'IDLE';           // 'IDLE' | 'GRABBED' | 'PLACED'
+  // ── Interaction state ─────────────────────────────────────────────
+  let state        = 'IDLE';   // 'IDLE' | 'GRABBED' | 'PLACED'
   let currentAngle = ARM_PARKED_ANGLE;
   let callbacks    = {};
-  let lastScrubTime = 0;
-  const SCRUB_THROTTLE = 30;    // ms
 
-  // ── Public init ──────────────────────────────────────────────────
+  // ── Scrub throttle ────────────────────────────────────────────────
+  let lastScrubTime = 0;
+  const SCRUB_THROTTLE = 65; // ms — matches AudioEngine SEEK_INTERVAL
+
+  // ── Velocity tracking (for pitch during drag) ─────────────────────
+  // Rolling low-pass average of drag speed in fractions/second.
+  // Positive = inward (toward inner groove / later), negative = outward.
+  let velPrevFrac = null;
+  let velPrevTime = null;
+  let scrubVelocity = 0;       // smoothed fractions/sec
+  const VEL_ALPHA   = 0.35;    // smoothing factor (lower = smoother/slower)
+
+  function _updateVelocity(frac, nowMs) {
+    if (velPrevFrac !== null && velPrevTime !== null) {
+      const dt = (nowMs - velPrevTime) / 1000;
+      // Only use samples in a reasonable window (skip outliers)
+      if (dt >= 0.008 && dt <= 0.15) {
+        const raw  = (frac - velPrevFrac) / dt;
+        scrubVelocity = scrubVelocity * (1 - VEL_ALPHA) + raw * VEL_ALPHA;
+      }
+    }
+    velPrevFrac = frac;
+    velPrevTime = nowMs;
+  }
+
+  function _resetVelocity() {
+    velPrevFrac   = null;
+    velPrevTime   = null;
+    scrubVelocity = 0;
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────
   function init(cb) {
     pivot        = document.getElementById('tonearm-pivot');
     platterArea  = document.getElementById('platter-area');
@@ -64,12 +91,11 @@ const Interaction = (() => {
 
     window.addEventListener('resize', _updateGeometry);
 
-    // Kill native browser drag ghost on ALL browsers (Chrome/Firefox ignore CSS user-drag).
-    // Without this, clicking any element and dragging shows a semi-transparent copy ghost.
+    // Suppress native browser drag ghost (Chrome/Firefox don't respect CSS user-drag)
     document.addEventListener('dragstart', (e) => e.preventDefault());
   }
 
-  // ── Geometry ─────────────────────────────────────────────────────
+  // ── Geometry ──────────────────────────────────────────────────────
   function _updateGeometry() {
     const pr = platterArea.getBoundingClientRect();
     platCenter = { x: pr.left + pr.width / 2, y: pr.top + pr.height / 2 };
@@ -83,26 +109,20 @@ const Interaction = (() => {
     pivotCenter = { x: pv.left + pv.width / 2, y: pv.top + pv.height / 2 };
   }
 
-  // ── Angle application ─────────────────────────────────────────────
-  // withTransition: false → transition: none (during drag / sync)
-  // withTransition: true  → single ease-out for park animation
+  // ── Angle ──────────────────────────────────────────────────────────
   function _applyAngle(deg, withTransition) {
     currentAngle = deg;
-    pivot.style.transition = withTransition
-      ? 'transform 0.55s ease-out'
-      : 'none';
-    pivot.style.transform = `rotate(${deg}deg)`;
+    pivot.style.transition = withTransition ? 'transform 0.55s ease-out' : 'none';
+    pivot.style.transform  = `rotate(${deg}deg)`;
   }
 
-  // ── Polar coordinate: pointer → CSS arm angle ────────────────────
-  // Arm base direction is WEST (180° from east). CSS rotate = deviation.
   function _pointerToDeg(px, py) {
     const dx = px - pivotCenter.x;
     const dy = py - pivotCenter.y;
     return Math.atan2(dy, dx) * (180 / Math.PI) - 180;
   }
 
-  // ── Record hit testing ────────────────────────────────────────────
+  // ── Record hit tests ───────────────────────────────────────────────
   function _distFromCenter(px, py) {
     const dx = px - platCenter.x;
     const dy = py - platCenter.y;
@@ -125,73 +145,102 @@ const Interaction = (() => {
     return ARM_OUTER_ANGLE + frac * (ARM_INNER_ANGLE - ARM_OUTER_ANGLE);
   }
 
-  // ── Pointer handlers ──────────────────────────────────────────────
+  // ── Pointer: DOWN ──────────────────────────────────────────────────
   function _onDown(e) {
     if (state === 'GRABBED') return;
     e.preventDefault();
     e.stopPropagation();
-
-    // Capture pointer so move/up fire here even if finger slides off element.
-    // Critical for mobile — without this, fast swipes lose tracking.
     try { e.target.setPointerCapture(e.pointerId); } catch (_) {}
 
     AudioEngine.ensureContext();
     _updateGeometry();
+    _resetVelocity();
 
-    // If playing, lift needle first
-    if (state === 'PLACED' || AudioEngine.isPlaying()) {
-      AudioEngine.pause();
-      Renderer.stopSpin();
-      if (callbacks.onLift) callbacks.onLift();
+    if (AudioEngine.isPlaying()) {
+      // Audio is running — enter scrub mode.
+      // Do NOT pause; let audio keep playing while needle is held.
+      // Pitch and position are adjusted live via scrubTo().
+      AudioEngine.beginScrub();
     }
+    // If not playing: normal IDLE→GRABBED, no scrub needed.
 
     state = 'GRABBED';
     document.body.classList.add('dragging');
   }
 
+  // ── Pointer: MOVE ──────────────────────────────────────────────────
   function _onMove(e) {
     if (state !== 'GRABBED') return;
     e.preventDefault();
 
-    const deg = Math.max(ARM_DRAG_MIN,
-      Math.min(ARM_DRAG_MAX, _pointerToDeg(e.clientX, e.clientY)));
+    // Arm follows pointer along its arc
+    const deg = Math.max(ARM_DRAG_MIN, Math.min(ARM_DRAG_MAX, _pointerToDeg(e.clientX, e.clientY)));
     _applyAngle(deg, false);
 
-    // Live scrub hint while hovering over groove band
-    const now = Date.now();
-    if (now - lastScrubTime < SCRUB_THROTTLE) return;
-    lastScrubTime = now;
-    if (_isOnRecord(e.clientX, e.clientY) && AudioEngine.hasAudio()) {
-      if (callbacks.onScrub) callbacks.onScrub(_pointerToFraction(e.clientX, e.clientY));
+    if (!AudioEngine.isScrubbing() || !AudioEngine.hasAudio()) return;
+
+    const nowMs = Date.now();
+    const frac  = _pointerToFraction(e.clientX, e.clientY);
+    _updateVelocity(frac, nowMs);
+
+    // Throttled scrub (matches audio engine's seek interval)
+    if (nowMs - lastScrubTime < SCRUB_THROTTLE) return;
+    lastScrubTime = nowMs;
+
+    if (_isOnRecord(e.clientX, e.clientY)) {
+      AudioEngine.scrubTo(frac * AudioEngine.getDuration(), scrubVelocity);
+      if (callbacks.onScrub) callbacks.onScrub(frac);
     }
   }
 
+  // ── Pointer: UP ────────────────────────────────────────────────────
   function _onUp(e) {
     if (state !== 'GRABBED') return;
-
     document.body.classList.remove('dragging');
 
-    if (_isOnRecord(e.clientX, e.clientY) && AudioEngine.hasAudio()) {
-      const frac   = _pointerToFraction(e.clientX, e.clientY);
-      const seekTo = frac * AudioEngine.getDuration();
+    const onRec   = _isOnRecord(e.clientX, e.clientY);
+    const hasAudio = AudioEngine.hasAudio();
+    const wasScrubbing = AudioEngine.isScrubbing();
 
-      // Clamp angle to valid groove range, no transition — arm stays put
-      const clamped = Math.max(ARM_OUTER_ANGLE - 1,
-        Math.min(ARM_INNER_ANGLE, _pointerToDeg(e.clientX, e.clientY)));
+    if (onRec && hasAudio) {
+      const frac    = _pointerToFraction(e.clientX, e.clientY);
+      const seekTo  = frac * AudioEngine.getDuration();
+      const clamped = Math.max(ARM_OUTER_ANGLE - 1, Math.min(ARM_INNER_ANGLE, _pointerToDeg(e.clientX, e.clientY)));
       _applyAngle(clamped, false);
 
       state = 'PLACED';
-      AudioEngine.play(seekTo, _onTrackEnd);
-      Renderer.startSpin();
-      if (callbacks.onDrop) callbacks.onDrop(frac, seekTo);
+
+      if (wasScrubbing) {
+        // Was playing during drag — settle to final groove, ramp pitch back to 1.0.
+        // Audio keeps playing; endScrub does a final micro-fade seek.
+        AudioEngine.endScrub(seekTo);
+        if (callbacks.onDrop) callbacks.onDrop(frac, seekTo);
+      } else {
+        // Fresh needle drop from parked position — start playback.
+        AudioEngine.play(seekTo, _onTrackEnd);
+        Renderer.startSpin();
+        if (callbacks.onDrop) callbacks.onDrop(frac, seekTo);
+      }
     } else {
-      // Miss — ease arm back to park, no bounce
+      // Released off record
+      if (wasScrubbing) {
+        AudioEngine.endScrub(null);  // restore pitch only
+        AudioEngine.pause();
+        Renderer.stopSpin();
+      } else if (AudioEngine.isPlaying()) {
+        AudioEngine.pause();
+        Renderer.stopSpin();
+      }
+
       state = 'IDLE';
       _applyAngle(ARM_PARKED_ANGLE, true);
       if (callbacks.onLift) callbacks.onLift();
     }
+
+    _resetVelocity();
   }
 
+  // ── Track end ──────────────────────────────────────────────────────
   function _onTrackEnd() {
     state = 'IDLE';
     Renderer.stopSpin();
@@ -199,8 +248,8 @@ const Interaction = (() => {
     if (callbacks.onEnd) callbacks.onEnd();
   }
 
-  // ── Playback sync (called each animation frame) ───────────────────
-  // Moves arm inward as track progresses. transition: none so it's frame-perfect.
+  // ── Arm sync loop (called each animation frame) ───────────────────
+  // Runs only while PLACED. During GRABBED, arm is manually controlled.
   function syncArmToPlayback() {
     if (state !== 'PLACED' || !AudioEngine.isPlaying()) return;
     const frac = Math.min(AudioEngine.getCurrentTime() / AudioEngine.getDuration(), 1);
