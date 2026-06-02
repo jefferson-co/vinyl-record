@@ -15,7 +15,7 @@
 const Spotify = (() => {
 
   // ── Config ─────────────────────────────────────────────────────
-  const CLIENT_ID   = 'YOUR_SPOTIFY_CLIENT_ID'; // ← paste your Client ID here
+  const CLIENT_ID   = '90d2fe19f3764b6a8afa5d26a3419631';
   const REDIRECT_URI = window.location.origin + window.location.pathname;
   const SCOPES = [
     'user-read-private',
