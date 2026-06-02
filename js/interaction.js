@@ -63,6 +63,10 @@ const Interaction = (() => {
     document.addEventListener('pointercancel', _onUp);
 
     window.addEventListener('resize', _updateGeometry);
+
+    // Kill native browser drag ghost on ALL browsers (Chrome/Firefox ignore CSS user-drag).
+    // Without this, clicking any element and dragging shows a semi-transparent copy ghost.
+    document.addEventListener('dragstart', (e) => e.preventDefault());
   }
 
   // ── Geometry ─────────────────────────────────────────────────────
