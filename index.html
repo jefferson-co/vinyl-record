@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Vinyl Record Player</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- Scene wrapper handles camera perspective -->
+    <div id="scene">
+      <div id="camera-rig">
+
+        <!-- Turntable plinth / base -->
+        <div id="turntable">
+
+          <!-- Wood grain surface -->
+          <canvas id="wood-grain" aria-hidden="true"></canvas>
+
+          <!-- Felt mat + record assembly -->
+          <div id="platter-area">
+            <div id="felt-mat"></div>
+            <canvas id="record-canvas"></canvas>
+            <div id="center-spindle"></div>
+
+            <!-- Center label overlay (shows filename) -->
+            <div id="center-label">
+              <div id="label-inner">
+                <div id="label-title">VINYL</div>
+                <div id="label-track">drop a track</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tonearm assembly -->
+          <div id="tonearm-assembly">
+            <div id="tonearm-pivot">
+              <div id="counterweight"></div>
+              <div id="arm-tube">
+                <div id="headshell">
+                  <div id="stylus-shaft">
+                    <div id="needle-tip"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Upload slot – styled as vintage label plate -->
+          <div id="upload-slot">
+            <input type="file" id="file-input" accept=".mp3,.wav,.m4a,.ogg,audio/*" />
+            <label for="file-input" id="upload-label">
+              <div id="upload-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M9 17H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v3"/>
+                  <polyline points="16 6 12 2 8 6"/>
+                  <line x1="12" y1="2" x2="12" y2="13"/>
+                  <circle cx="18" cy="18" r="4"/>
+                  <path d="M18 14v8M14 18h8"/>
+                </svg>
+              </div>
+              <span id="upload-text">LOAD RECORD</span>
+            </label>
+          </div>
+
+          <!-- Camera toggle -->
+          <button id="camera-toggle" aria-label="Toggle camera angle">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            <span id="camera-label">FRONT VIEW</span>
+          </button>
+
+          <!-- Status indicator (subtle) -->
+          <div id="status-bar">
+            <div id="status-dot"></div>
+            <span id="status-text">READY</span>
+          </div>
+
+        </div><!-- /turntable -->
+      </div><!-- /camera-rig -->
+    </div><!-- /scene -->
+
+    <!-- Subtle ambient hint -->
+    <div id="hint" aria-live="polite">Drag the needle onto the record to play</div>
+
+  </div><!-- /app -->
+
+  <!-- Load order matters: audioEngine first, then interaction, then app -->
+  <script src="js/audioEngine.js"></script>
+  <script src="js/renderer.js"></script>
+  <script src="js/interaction.js"></script>
+  <script src="js/camera.js"></script>
+  <script src="js/upload.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

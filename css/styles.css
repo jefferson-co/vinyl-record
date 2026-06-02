@@ -1,0 +1,713 @@
+/* =========================================================
+   VINYL RECORD PLAYER – Premium Analog Turntable
+   ========================================================= */
+
+/* ── Reset & Base ─────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* palette */
+  --walnut-dark:   #2c1f14;
+  --walnut-mid:    #3d2b1a;
+  --walnut-light:  #5c3d24;
+  --walnut-hi:     #7a5232;
+  --cream:         #f0e6d0;
+  --amber:         #c8913a;
+  --amber-dark:    #8b5e1a;
+  --gold:          #d4a843;
+  --gold-light:    #e8c870;
+  --metal-dark:    #1a1a1a;
+  --metal-mid:     #2e2e2e;
+  --metal-light:   #4a4a4a;
+  --metal-sheen:   #6a6a6a;
+  --vinyl-black:   #0d0d0f;
+  --vinyl-groove:  #1a1a1e;
+  --label-red:     #8b1a1a;
+  --label-cream:   #e8d4a0;
+  --felt-green:    #1a2e1a;
+  --felt-mid:      #223322;
+
+  /* layout */
+  --plinth-w:      680px;
+  --plinth-h:      520px;
+  --platter-size:  340px;
+  --record-size:   320px;
+
+  /* animation */
+  --spin-duration: 1.8s;  /* 33⅓ RPM ≈ 1.8s per revolution */
+}
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: #1a1208;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  -webkit-font-smoothing: antialiased;
+  touch-action: none;
+  user-select: none;
+}
+
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(90,55,20,0.4) 0%, transparent 60%),
+    radial-gradient(ellipse at 70% 80%, rgba(60,35,10,0.3) 0%, transparent 50%),
+    linear-gradient(160deg, #1c140a 0%, #0f0b05 50%, #1a1208 100%);
+  min-height: 100vh;
+}
+
+/* ── Scene / Camera System ───────────────────────────── */
+#scene {
+  perspective: 1200px;
+  perspective-origin: 50% 40%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+#camera-rig {
+  transform-style: preserve-3d;
+  transition: transform 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  transform: rotateX(0deg) rotateZ(0deg);
+}
+
+#camera-rig.angled {
+  transform: rotateX(32deg) rotateZ(-3deg) translateY(-20px);
+}
+
+/* ── Plinth / Base ───────────────────────────────────── */
+#turntable {
+  position: relative;
+  width: var(--plinth-w);
+  height: var(--plinth-h);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, var(--walnut-hi) 0%, var(--walnut-mid) 30%, var(--walnut-dark) 70%, #1a1008 100%);
+  box-shadow:
+    0 0 0 1px rgba(255,220,120,0.12),
+    0 4px 12px rgba(0,0,0,0.6),
+    0 20px 60px rgba(0,0,0,0.8),
+    0 40px 100px rgba(0,0,0,0.5),
+    inset 0 1px 0 rgba(255,210,100,0.15),
+    inset 0 -1px 0 rgba(0,0,0,0.5),
+    inset 2px 0 6px rgba(255,180,60,0.06),
+    inset -2px 0 6px rgba(0,0,0,0.3);
+  overflow: visible;
+}
+
+/* Wood grain canvas overlay */
+#wood-grain {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  border-radius: 14px;
+  opacity: 0.18;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+}
+
+/* Beveled edge highlight */
+#turntable::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  background: linear-gradient(160deg,
+    rgba(255,210,100,0.12) 0%,
+    transparent 40%,
+    transparent 60%,
+    rgba(0,0,0,0.2) 100%);
+  pointer-events: none;
+}
+
+#turntable::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,200,80,0.08);
+  pointer-events: none;
+}
+
+/* ── Platter Area ────────────────────────────────────── */
+#platter-area {
+  position: absolute;
+  top: 50%;
+  left: 44%;
+  transform: translate(-50%, -50%);
+  width: var(--platter-size);
+  height: var(--platter-size);
+}
+
+/* ── Felt Mat ────────────────────────────────────────── */
+#felt-mat {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--felt-mid) 0%, var(--felt-green) 100%);
+  box-shadow:
+    inset 0 0 20px rgba(0,0,0,0.6),
+    0 2px 8px rgba(0,0,0,0.5);
+}
+
+/* Felt texture via pseudo */
+#felt-mat::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background-image:
+    repeating-conic-gradient(rgba(255,255,255,0.015) 0deg, transparent 1deg, transparent 3deg);
+  opacity: 0.6;
+}
+
+/* ── Record Canvas ───────────────────────────────────── */
+#record-canvas {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: var(--record-size);
+  height: var(--record-size);
+  border-radius: 50%;
+  cursor: default;
+}
+
+/* ── Center Spindle ──────────────────────────────────── */
+#center-spindle {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #888 0%, #333 60%, #111 100%);
+  box-shadow: 0 0 0 2px #222, 0 0 4px rgba(0,0,0,0.8);
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* ── Center Label ────────────────────────────────────── */
+#center-label {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 88px; height: 88px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #c4a060 0%, var(--label-cream) 30%, #d4b070 60%, #a88040 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 8;
+  box-shadow:
+    0 1px 4px rgba(0,0,0,0.5),
+    inset 0 1px 0 rgba(255,255,255,0.3);
+  pointer-events: none;
+  overflow: hidden;
+}
+
+#center-label::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    rgba(0,0,0,0.04) 0deg,
+    transparent 1deg,
+    transparent 5deg
+  );
+}
+
+#label-inner {
+  text-align: center;
+  z-index: 1;
+  padding: 0 8px;
+}
+
+#label-title {
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  color: var(--walnut-dark);
+  text-transform: uppercase;
+  line-height: 1;
+  margin-bottom: 3px;
+}
+
+#label-track {
+  font-size: 7px;
+  color: var(--walnut-mid);
+  letter-spacing: 0.5px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 74px;
+  display: block;
+}
+
+/* ── Tonearm Assembly ────────────────────────────────── */
+/*
+  Layout: pivot at upper-right of plinth.
+  Arm extends LEFT from pivot (toward record).
+  Counterweight extends RIGHT from pivot (away from record).
+  CSS rotation on #tonearm-pivot sweeps arm left/right:
+    negative = arm tip goes UP (parked above record)
+    positive = arm tip goes DOWN (toward inner groove)
+*/
+#tonearm-assembly {
+  position: absolute;
+  top: 18%;
+  right: 28px;
+  width: 180px;
+  height: 260px;
+  pointer-events: none;
+}
+
+#tonearm-pivot {
+  position: absolute;
+  top: 14px;
+  right: 12px;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #8a8a8a 0%, #444 50%, #1a1a1a 100%);
+  box-shadow:
+    0 3px 8px rgba(0,0,0,0.8),
+    inset 0 1px 0 rgba(255,255,255,0.22),
+    0 0 0 3px #1e1e1e,
+    0 0 0 5px #2e2e2e,
+    0 0 0 6px #1a1a1a;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+  pointer-events: all;
+  cursor: grab;
+}
+
+#tonearm-pivot:active { cursor: grabbing; }
+
+#tonearm-pivot::after {
+  content: '';
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #bbb 0%, #666 60%, #333 100%);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.4);
+  z-index: 1;
+}
+
+/*
+  Arm tube extends LEFT from pivot center.
+  right: 50% anchors the arm's right edge at the pivot center.
+  transform-origin: right center = rotation point is at the right end of tube (pivot center).
+*/
+#arm-tube {
+  position: absolute;
+  top: 50%;
+  right: 50%;                    /* right edge of tube = pivot center */
+  width: 170px;
+  height: 9px;
+  margin-top: -4.5px;
+  transform-origin: 100% 50%;    /* rotate around right end */
+  background: linear-gradient(180deg,
+    rgba(200,180,120,0.25) 0%,
+    #3e3830 8%,
+    #5c5244 25%,
+    #706050 50%,
+    #4e4438 75%,
+    #2c2820 100%);
+  border-radius: 2px 5px 5px 2px;
+  box-shadow:
+    0 2px 4px rgba(0,0,0,0.7),
+    0 -1px 0 rgba(255,210,100,0.12),
+    inset 0 1px 0 rgba(255,220,110,0.18),
+    inset 0 -1px 0 rgba(0,0,0,0.5);
+}
+
+/* S-curve suggestion at headshell end */
+#arm-tube::before {
+  content: '';
+  position: absolute;
+  right: 0; top: -3px;
+  width: 50px; height: 15px;
+  background: linear-gradient(180deg, #706050 0%, #5a4a3c 50%, #3e3830 100%);
+  border-radius: 5px 2px 2px 5px;
+  transform: rotate(5deg);
+  transform-origin: 100% 50%;
+}
+
+/* Counterweight: RIGHT of pivot (opposite from arm/record direction) */
+#counterweight {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 4px);
+  transform: translateY(-50%);
+  width: 22px; height: 26px;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #727272 0%, #3a3a3a 50%, #1e1e1e 100%);
+  box-shadow:
+    0 3px 6px rgba(0,0,0,0.8),
+    inset 0 1px 0 rgba(255,255,255,0.18),
+    inset 0 -1px 0 rgba(0,0,0,0.4);
+}
+
+/* Counterweight groove detail */
+#counterweight::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 2px; right: 2px;
+  height: 2px;
+  margin-top: -1px;
+  background: rgba(0,0,0,0.5);
+  border-radius: 1px;
+}
+
+/* Headshell at LEFT end of arm (toward record) */
+#headshell {
+  position: absolute;
+  left: -22px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px; height: 16px;
+  background: linear-gradient(180deg, #5c5040 0%, #3c3020 50%, #2c2018 100%);
+  border-radius: 8px 3px 3px 8px;
+  box-shadow:
+    0 1px 4px rgba(0,0,0,0.6),
+    inset 0 1px 0 rgba(255,210,90,0.12);
+  pointer-events: all;
+  cursor: grab;
+}
+
+/* Stylus shaft hangs down from headshell */
+#stylus-shaft {
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px; height: 20px;
+  background: linear-gradient(180deg, #999 0%, #555 100%);
+  border-radius: 1px;
+}
+
+/* Needle tip */
+#needle-tip {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #e0c880 0%, var(--amber) 50%, var(--amber-dark) 100%);
+  box-shadow:
+    0 1px 3px rgba(0,0,0,0.8),
+    0 0 6px rgba(200,145,58,0.4);
+}
+
+/* ── Upload Slot ─────────────────────────────────────── */
+#upload-slot {
+  position: absolute;
+  bottom: 24px;
+  left: 30px;
+  width: 200px;
+}
+
+#file-input {
+  position: absolute;
+  opacity: 0;
+  width: 0; height: 0;
+  pointer-events: none;
+}
+
+#upload-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  background:
+    linear-gradient(180deg, rgba(40,28,16,0.95) 0%, rgba(25,16,8,0.98) 100%);
+  border: 1px solid rgba(180,130,50,0.25);
+  border-bottom: 1px solid rgba(0,0,0,0.5);
+  box-shadow:
+    0 1px 0 rgba(255,200,80,0.08) inset,
+    0 -1px 0 rgba(0,0,0,0.4) inset,
+    0 2px 8px rgba(0,0,0,0.5),
+    0 0 0 1px rgba(0,0,0,0.3);
+  transition: all 0.15s ease;
+  /* Engraved look */
+  text-shadow: 0 1px 0 rgba(0,0,0,0.8);
+}
+
+#upload-label:hover {
+  background:
+    linear-gradient(180deg, rgba(55,38,20,0.95) 0%, rgba(35,22,10,0.98) 100%);
+  border-color: rgba(200,160,70,0.35);
+  box-shadow:
+    0 1px 0 rgba(255,210,100,0.1) inset,
+    0 -1px 0 rgba(0,0,0,0.4) inset,
+    0 3px 12px rgba(0,0,0,0.6),
+    0 0 0 1px rgba(0,0,0,0.3);
+}
+
+#upload-label:active {
+  transform: translateY(1px);
+  box-shadow:
+    0 0 0 rgba(255,200,80,0.08) inset,
+    0 1px 4px rgba(0,0,0,0.5);
+}
+
+#upload-icon {
+  color: var(--amber);
+  opacity: 0.8;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+#upload-text {
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  color: var(--amber);
+  opacity: 0.75;
+  font-family: 'Georgia', serif;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Decorative screws on upload slot */
+#upload-slot::before,
+#upload-slot::after {
+  content: '';
+  position: absolute;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #666 0%, #222 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
+  top: 50%; transform: translateY(-50%);
+}
+#upload-slot::before { left: -10px; }
+#upload-slot::after  { right: -10px; }
+
+/* ── Camera Toggle ───────────────────────────────────── */
+#camera-toggle {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: 4px;
+  border: 1px solid rgba(180,130,50,0.25);
+  background:
+    linear-gradient(180deg, rgba(40,28,16,0.95) 0%, rgba(25,16,8,0.98) 100%);
+  cursor: pointer;
+  color: var(--amber);
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  font-family: 'Georgia', serif;
+  text-transform: uppercase;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  transition: all 0.15s ease;
+}
+
+#camera-toggle:hover {
+  border-color: rgba(200,160,70,0.35);
+  background:
+    linear-gradient(180deg, rgba(55,38,20,0.95) 0%, rgba(35,22,10,0.98) 100%);
+}
+
+#camera-toggle:active { transform: translateY(1px); }
+
+/* ── Status Bar ──────────────────────────────────────── */
+#status-bar {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0.6;
+}
+
+#status-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #444;
+  transition: background 0.4s ease, box-shadow 0.4s ease;
+}
+
+#status-dot.playing {
+  background: #7fc47f;
+  box-shadow: 0 0 6px rgba(120,200,120,0.7);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+#status-dot.ready {
+  background: var(--amber);
+  box-shadow: 0 0 4px rgba(200,145,58,0.4);
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+#status-text {
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: var(--cream);
+  font-family: 'Georgia', serif;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+/* ── Hint Text ───────────────────────────────────────── */
+#hint {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  color: rgba(200,175,120,0.45);
+  font-family: 'Georgia', serif;
+  pointer-events: none;
+  transition: opacity 0.6s ease;
+  white-space: nowrap;
+}
+
+#hint.hidden { opacity: 0; }
+
+/* ── Record Spin Animation ───────────────────────────── */
+@keyframes spin-record {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to   { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+#record-canvas.spinning {
+  animation: spin-record var(--spin-duration) linear infinite;
+}
+
+/* Needle drag ghost state */
+#tonearm-pivot.dragging {
+  cursor: grabbing;
+}
+
+/* ── Needle on arm – actual tonearm rotation ─────────── */
+/* This is controlled via JS transform on #tonearm-pivot */
+
+/* ── Plinth surface details ──────────────────────────── */
+/* Left vent strip */
+#turntable .vent {
+  position: absolute;
+  top: 50%;
+  left: 18px;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vent-line {
+  width: 4px;
+  height: 40px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 2px;
+  box-shadow: inset 0 1px 0 rgba(255,200,80,0.05);
+}
+
+/* ── Shimmer / Gloss strip on plinth top ─────────────── */
+#turntable::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 40%;
+  border-radius: 14px 14px 0 0;
+  background: linear-gradient(180deg,
+    rgba(255,210,100,0.07) 0%,
+    transparent 100%);
+  pointer-events: none;
+}
+
+/* ── Responsive Scaling ──────────────────────────────── */
+@media (max-width: 780px) {
+  :root {
+    --plinth-w:    min(95vw, 580px);
+    --plinth-h:    calc(var(--plinth-w) * 0.76);
+    --platter-size: calc(var(--plinth-w) * 0.5);
+    --record-size:  calc(var(--plinth-w) * 0.47);
+  }
+
+  #tonearm-assembly {
+    right: calc(var(--plinth-w) * 0.07);
+    width: calc(var(--plinth-w) * 0.24);
+  }
+
+  #arm-tube { width: calc(var(--plinth-w) * 0.19); }
+
+  #upload-slot { bottom: 18px; left: 20px; width: 170px; }
+  #camera-toggle { bottom: 18px; right: 18px; }
+}
+
+@media (max-width: 520px) {
+  :root {
+    --plinth-w:    98vw;
+    --plinth-h:    calc(var(--plinth-w) * 0.82);
+    --platter-size: calc(var(--plinth-w) * 0.52);
+    --record-size:  calc(var(--plinth-w) * 0.49);
+  }
+
+  #arm-tube { width: calc(var(--plinth-w) * 0.2); }
+
+  #center-label { width: 72px; height: 72px; }
+  #label-title { font-size: 7px; }
+  #label-track { font-size: 6px; max-width: 60px; }
+
+  #upload-slot { width: 150px; }
+  #upload-text { font-size: 8px; letter-spacing: 1.5px; }
+  #camera-toggle { font-size: 8px; letter-spacing: 1.5px; }
+
+  #hint { font-size: 9px; }
+}
+
+/* Dragging overlay prevents interference */
+body.dragging * { cursor: grabbing !important; }
+
+/* Transition for arm position changes */
+#tonearm-pivot {
+  transition: transform 0.08s linear;
+}
+#tonearm-pivot.smooth-transition {
+  transition: transform 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* Subtle drop shadow under platter */
+#platter-area::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.4);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* File loaded state */
+#upload-label.loaded {
+  border-color: rgba(120,180,100,0.3);
+}
+
+#upload-label.loaded #upload-text {
+  color: #7fc47f;
+}
+
+#upload-label.loaded #upload-icon {
+  color: #7fc47f;
+}
