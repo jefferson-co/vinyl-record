@@ -7,16 +7,13 @@
 (function () {
   'use strict';
 
-  // ── DOM refs ────────────────────────────────────────
   const statusDot  = document.getElementById('status-dot');
   const statusText = document.getElementById('status-text');
   const hint       = document.getElementById('hint');
 
-  // ── State ───────────────────────────────────────────
-  let audioLoaded = false;
-  let hintDismissed = false;
+  let audioLoaded    = false;
+  let hintDismissed  = false;
 
-  // ── Boot ────────────────────────────────────────────
   window.addEventListener('DOMContentLoaded', () => {
     Renderer.init();
     Camera.init();
@@ -27,19 +24,16 @@
       onScrub: onScrub,
       onEnd:   onTrackEnd,
     });
+    Spotify.init(onSpotifyTrackSelected);
 
     _addVentLines();
     _setStatus('READY', false);
-
-    // Start main loop
     _mainLoop();
   });
 
-  // ── Event handlers ───────────────────────────────────
-
+  // ── Audio loaded (file upload) ────────────────────────────────────
   function onAudioLoaded(name, duration) {
     audioLoaded = true;
-    // Stop any current playback, park arm
     AudioEngine.stop();
     Renderer.stopSpin(true);
     Interaction.parkArm(true);
@@ -47,6 +41,42 @@
     _showHint('Drag the needle onto the record to play');
   }
 
+  // ── Spotify track selected ────────────────────────────────────────
+  function onSpotifyTrackSelected(track) {
+    // Stop current playback and park
+    AudioEngine.stop();
+    Renderer.stopSpin(true);
+    Interaction.parkArm(true);
+
+    // Update center label
+    document.getElementById('label-title').textContent = 'SPOTIFY';
+    document.getElementById('label-track').textContent = track.name;
+
+    // Update upload slot label to show track name
+    const uploadText = document.getElementById('upload-text');
+    const shortName = track.name.length > 14 ? track.name.slice(0, 14) + '…' : track.name;
+    uploadText.textContent = shortName;
+    document.getElementById('upload-label').classList.add('loaded');
+
+    _setStatus('LOADING', false);
+    _showHint(`Loading: ${track.name}`);
+
+    AudioEngine.loadUrl(
+      track.previewUrl,
+      (duration) => {
+        audioLoaded = true;
+        _setStatus('LOADED', false);
+        _showHint('Drag the needle onto the record to play');
+      },
+      () => {
+        _setStatus('ERROR', false);
+        _showHint('Preview unavailable — try another track');
+        setTimeout(() => _showHint('Drag the needle onto the record to play'), 3000);
+      }
+    );
+  }
+
+  // ── Needle interaction callbacks ──────────────────────────────────
   function onNeedleDrop(fraction, seekSeconds) {
     _dismissHint();
     _setStatus('PLAYING', true);
@@ -56,9 +86,7 @@
     _setStatus(audioLoaded ? 'LOADED' : 'READY', false);
   }
 
-  function onScrub(fraction) {
-    // Visual feedback – status stays "PLAYING"
-  }
+  function onScrub() { /* status stays "PLAYING" */ }
 
   function onTrackEnd() {
     _setStatus('DONE', false);
@@ -67,15 +95,13 @@
     }, 2000);
   }
 
-  // ── Main animation loop ──────────────────────────────
-  // Syncs tonearm position to playback progress
+  // ── Animation loop ────────────────────────────────────────────────
   function _mainLoop() {
     Interaction.syncArmToPlayback();
     requestAnimationFrame(_mainLoop);
   }
 
-  // ── UI helpers ───────────────────────────────────────
-
+  // ── UI helpers ────────────────────────────────────────────────────
   function _setStatus(text, isPlaying) {
     statusText.textContent = text;
     statusDot.className = '';
@@ -84,7 +110,6 @@
   }
 
   function _showHint(msg) {
-    if (hintDismissed) return;
     hint.textContent = msg;
     hint.classList.remove('hidden');
   }
@@ -94,10 +119,9 @@
     hint.classList.add('hidden');
   }
 
-  // ── Decorative vent lines on plinth ─────────────────
   function _addVentLines() {
     const plinth = document.getElementById('turntable');
-    const vent = document.createElement('div');
+    const vent   = document.createElement('div');
     vent.className = 'vent';
     for (let i = 0; i < 4; i++) {
       const line = document.createElement('div');

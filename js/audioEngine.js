@@ -52,6 +52,27 @@ const AudioEngine = (() => {
     reader.readAsArrayBuffer(file);
   }
 
+  /** Load a remote URL (e.g. Spotify preview_url), decode, call back with duration */
+  function loadUrl(url, onReady, onError) {
+    ensureContext();
+    fetch(url)
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.arrayBuffer();
+      })
+      .then(buf => ctx.decodeAudioData(buf))
+      .then(buffer => {
+        stop();
+        audioBuffer = buffer;
+        startOffset = 0;
+        if (onReady) onReady(buffer.duration);
+      })
+      .catch(err => {
+        console.error('URL load error:', err);
+        if (onError) onError(err);
+      });
+  }
+
   /** Start playback from a given offset (seconds). */
   function play(offsetSeconds, onEnd) {
     if (!audioBuffer) return;
@@ -238,6 +259,7 @@ const AudioEngine = (() => {
   // Public API
   return {
     loadFile,
+    loadUrl,
     play,
     pause,
     stop,
