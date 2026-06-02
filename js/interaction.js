@@ -127,6 +127,10 @@ const Interaction = (() => {
     e.preventDefault();
     e.stopPropagation();
 
+    // Capture pointer so move/up fire here even if finger slides off element.
+    // Critical for mobile — without this, fast swipes lose tracking.
+    try { e.target.setPointerCapture(e.pointerId); } catch (_) {}
+
     AudioEngine.ensureContext();
     _updateGeometry();
 

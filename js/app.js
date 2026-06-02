@@ -1,7 +1,6 @@
 /**
  * app.js
- * Main orchestrator. Wires all modules together,
- * runs the main animation loop for arm sync.
+ * Main orchestrator. Wires all modules, runs the arm-sync animation loop.
  */
 
 (function () {
@@ -11,8 +10,8 @@
   const statusText = document.getElementById('status-text');
   const hint       = document.getElementById('hint');
 
-  let audioLoaded    = false;
-  let hintDismissed  = false;
+  let audioLoaded   = false;
+  let hintDismissed = false;
 
   window.addEventListener('DOMContentLoaded', () => {
     Renderer.init();
@@ -24,15 +23,13 @@
       onScrub: onScrub,
       onEnd:   onTrackEnd,
     });
-    Spotify.init(onSpotifyTrackSelected);
 
     _addVentLines();
     _setStatus('READY', false);
     _mainLoop();
   });
 
-  // ── Audio loaded (file upload) ────────────────────────────────────
-  function onAudioLoaded(name, duration) {
+  function onAudioLoaded(name) {
     audioLoaded = true;
     AudioEngine.stop();
     Renderer.stopSpin(true);
@@ -41,43 +38,7 @@
     _showHint('Drag the needle onto the record to play');
   }
 
-  // ── Spotify track selected ────────────────────────────────────────
-  function onSpotifyTrackSelected(track) {
-    // Stop current playback and park
-    AudioEngine.stop();
-    Renderer.stopSpin(true);
-    Interaction.parkArm(true);
-
-    // Update center label
-    document.getElementById('label-title').textContent = 'SPOTIFY';
-    document.getElementById('label-track').textContent = track.name;
-
-    // Update upload slot label to show track name
-    const uploadText = document.getElementById('upload-text');
-    const shortName = track.name.length > 14 ? track.name.slice(0, 14) + '…' : track.name;
-    uploadText.textContent = shortName;
-    document.getElementById('upload-label').classList.add('loaded');
-
-    _setStatus('LOADING', false);
-    _showHint(`Loading: ${track.name}`);
-
-    AudioEngine.loadUrl(
-      track.previewUrl,
-      (duration) => {
-        audioLoaded = true;
-        _setStatus('LOADED', false);
-        _showHint('Drag the needle onto the record to play');
-      },
-      () => {
-        _setStatus('ERROR', false);
-        _showHint('Preview unavailable — try another track');
-        setTimeout(() => _showHint('Drag the needle onto the record to play'), 3000);
-      }
-    );
-  }
-
-  // ── Needle interaction callbacks ──────────────────────────────────
-  function onNeedleDrop(fraction, seekSeconds) {
+  function onNeedleDrop() {
     _dismissHint();
     _setStatus('PLAYING', true);
   }
@@ -95,17 +56,15 @@
     }, 2000);
   }
 
-  // ── Animation loop ────────────────────────────────────────────────
   function _mainLoop() {
     Interaction.syncArmToPlayback();
     requestAnimationFrame(_mainLoop);
   }
 
-  // ── UI helpers ────────────────────────────────────────────────────
   function _setStatus(text, isPlaying) {
     statusText.textContent = text;
     statusDot.className = '';
-    if (isPlaying) statusDot.classList.add('playing');
+    if (isPlaying)          statusDot.classList.add('playing');
     else if (text === 'LOADED') statusDot.classList.add('ready');
   }
 

@@ -585,20 +585,10 @@ body {
 
 #hint.hidden { opacity: 0; }
 
-/* ── Record Spin Animation ───────────────────────────── */
-@keyframes spin-record {
-  from { transform: translate(-50%, -50%) rotate(0deg); }
-  to   { transform: translate(-50%, -50%) rotate(360deg); }
-}
+/* Record spin is done via canvas drawing in renderer.js — no CSS animation needed. */
 
-#record-canvas.spinning {
-  animation: spin-record var(--spin-duration) linear infinite;
-}
-
-/* Needle drag ghost state */
-#tonearm-pivot.dragging {
-  cursor: grabbing;
-}
+/* Needle drag state */
+#tonearm-pivot.dragging { cursor: grabbing; }
 
 /* ── Needle on arm – actual tonearm rotation ─────────── */
 /* This is controlled via JS transform on #tonearm-pivot */
@@ -636,46 +626,7 @@ body {
   pointer-events: none;
 }
 
-/* ── Responsive Scaling ──────────────────────────────── */
-@media (max-width: 780px) {
-  :root {
-    --plinth-w:    min(95vw, 580px);
-    --plinth-h:    calc(var(--plinth-w) * 0.76);
-    --platter-size: calc(var(--plinth-w) * 0.5);
-    --record-size:  calc(var(--plinth-w) * 0.47);
-  }
-
-  #tonearm-assembly {
-    right: calc(var(--plinth-w) * 0.07);
-    width: calc(var(--plinth-w) * 0.24);
-  }
-
-  #arm-tube { width: calc(var(--plinth-w) * 0.19); }
-
-  #upload-slot { bottom: 18px; left: 20px; width: 170px; }
-  #camera-toggle { bottom: 18px; right: 18px; }
-}
-
-@media (max-width: 520px) {
-  :root {
-    --plinth-w:    98vw;
-    --plinth-h:    calc(var(--plinth-w) * 0.82);
-    --platter-size: calc(var(--plinth-w) * 0.52);
-    --record-size:  calc(var(--plinth-w) * 0.49);
-  }
-
-  #arm-tube { width: calc(var(--plinth-w) * 0.2); }
-
-  #center-label { width: 72px; height: 72px; }
-  #label-title { font-size: 7px; }
-  #label-track { font-size: 6px; max-width: 60px; }
-
-  #upload-slot { width: 150px; }
-  #upload-text { font-size: 8px; letter-spacing: 1.5px; }
-  #camera-toggle { font-size: 8px; letter-spacing: 1.5px; }
-
-  #hint { font-size: 9px; }
-}
+/* Responsive rules are defined in the mobile section below */
 
 /* Dragging overlay prevents interference */
 body.dragging * { cursor: grabbing !important; }
@@ -715,414 +666,169 @@ body.dragging * { cursor: grabbing !important; }
 #upload-label.loaded #upload-icon {
   color: #7fc47f;
 }
-
 /* ═══════════════════════════════════════════════════════════
-   SPOTIFY INTEGRATION
+   DRAG / SELECTION PREVENTION + MOBILE FIXES
    ═══════════════════════════════════════════════════════════ */
 
-/* ── Spotify toggle button (on plinth) ─────────────────── */
-#spotify-toggle {
-  position: absolute;
-  top: 20px;
-  left: 24px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 12px;
-  border-radius: 4px;
-  border: 1px solid rgba(180,130,50,0.22);
-  background: linear-gradient(180deg, rgba(40,28,16,0.95) 0%, rgba(25,16,8,0.98) 100%);
-  cursor: pointer;
-  color: var(--amber);
-  font-size: 9px;
-  letter-spacing: 2.5px;
-  font-family: 'Georgia', serif;
-  text-transform: uppercase;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
-  transition: all 0.15s ease;
-  opacity: 0.75;
+/* ── Global: prevent text/image selection everywhere ────── */
+*, *::before, *::after {
+  user-select:         none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;   /* iOS long-press callout */
 }
 
-#spotify-toggle:hover {
-  border-color: rgba(200,160,70,0.35);
-  opacity: 1;
-  background: linear-gradient(180deg, rgba(55,38,20,0.95) 0%, rgba(35,22,10,0.98) 100%);
+/* ── Prevent native element drag ghosts ─────────────────── */
+/* Without this, clicking the tonearm or record on desktop  */
+/* shows a semi-transparent drag-copy ghost image.          */
+canvas,
+img,
+svg,
+#turntable,
+#platter-area,
+#record-canvas,
+#felt-mat,
+#center-label,
+#tonearm-assembly,
+#tonearm-pivot,
+#arm-tube,
+#headshell,
+#stylus-shaft,
+#needle-tip,
+#counterweight {
+  -webkit-user-drag: none;
+  user-drag:         none;
+  -webkit-tap-highlight-color: transparent;
 }
 
-#spotify-toggle:active { transform: translateY(1px); }
-
-#spotify-toggle svg circle { fill: #1DB954; }
-
-/* ── Spotify panel overlay ──────────────────────────────── */
-#spotify-panel {
-  position: fixed;
-  top: 0;
-  right: 0;
-  width: 320px;
-  height: 100%;
-  z-index: 200;
-  pointer-events: none;
-  transform: translateX(100%);
-  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+/* ── Touch-action: none on everything interactive ────────── */
+/* Without this, iOS/Android treat a drag as a scroll       */
+/* gesture and suppress pointermove events mid-drag.        */
+body,
+#app,
+#scene,
+#camera-rig,
+#turntable,
+#platter-area,
+#record-canvas,
+#tonearm-assembly,
+#tonearm-pivot,
+#arm-tube,
+#headshell,
+#stylus-shaft,
+#needle-tip {
+  touch-action: none;
 }
 
-#spotify-panel.sp-open {
-  transform: translateX(0);
-  pointer-events: all;
+/* Buttons/labels still need tap to work, so only suppress pan/zoom */
+#upload-label,
+#camera-toggle,
+#upload-slot {
+  touch-action: manipulation;
 }
 
-#sp-panel-inner {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  background:
-    linear-gradient(180deg, rgba(22,14,6,0.98) 0%, rgba(15,10,4,0.99) 100%);
-  border-left: 1px solid rgba(180,130,50,0.18);
-  box-shadow: -8px 0 40px rgba(0,0,0,0.7);
+/* ── Prevent iOS overscroll bounce messing with layout ───── */
+html, body {
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: auto;
 }
 
-/* ── Panel header ────────────────────────────────────────── */
-#sp-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 18px 20px 14px;
-  border-bottom: 1px solid rgba(180,130,50,0.12);
-  flex-shrink: 0;
-}
+/* ═══════════════════════════════════════════════════════════
+   RESPONSIVE SCALING – fluid from 320px to desktop
+   ═══════════════════════════════════════════════════════════ */
 
-#sp-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 9px;
-  letter-spacing: 3px;
-  color: var(--amber);
-  font-family: 'Georgia', serif;
-  text-transform: uppercase;
-  opacity: 0.85;
-}
-
-#sp-title-dot {
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  background: #1DB954;
-  box-shadow: 0 0 6px rgba(29,185,84,0.6);
-  animation: pulse-dot 2.5s ease-in-out infinite;
-}
-
-#sp-close {
-  width: 28px; height: 28px;
-  border-radius: 50%;
-  border: 1px solid rgba(180,130,50,0.2);
-  background: rgba(255,255,255,0.04);
-  color: var(--amber);
-  font-size: 11px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-  opacity: 0.6;
-}
-
-#sp-close:hover { opacity: 1; border-color: rgba(200,160,70,0.4); }
-
-/* ── Panel body ──────────────────────────────────────────── */
-#sp-body {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 12px 0 20px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(200,145,58,0.25) transparent;
-}
-
-#sp-body::-webkit-scrollbar { width: 4px; }
-#sp-body::-webkit-scrollbar-thumb {
-  background: rgba(200,145,58,0.25);
-  border-radius: 2px;
-}
-
-/* ── Section headers ─────────────────────────────────────── */
-.sp-section-header {
-  padding: 10px 20px 6px;
-  font-size: 8px;
-  letter-spacing: 2.5px;
-  color: var(--amber);
-  font-family: 'Georgia', serif;
-  text-transform: uppercase;
-  opacity: 0.5;
-  border-top: 1px solid rgba(180,130,50,0.08);
-  margin-top: 8px;
-}
-
-.sp-section-header:first-child { margin-top: 0; border-top: none; }
-
-/* ── Playlist rows ───────────────────────────────────────── */
-.sp-playlist-list { padding: 0 0 4px; }
-
-.sp-playlist-row {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 20px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  transition: background 0.12s ease;
-  text-align: left;
-}
-
-.sp-playlist-row:hover {
-  background: rgba(255,200,80,0.05);
-}
-
-.sp-playlist-row.active {
-  background: rgba(255,200,80,0.08);
-}
-
-.sp-playlist-arrow {
-  font-size: 8px;
-  color: var(--amber);
-  opacity: 0.4;
-  flex-shrink: 0;
-  transition: opacity 0.12s, transform 0.12s;
-}
-
-.sp-playlist-row.active .sp-playlist-arrow,
-.sp-playlist-row:hover .sp-playlist-arrow {
-  opacity: 0.8;
-  transform: translateX(2px);
-}
-
-.sp-playlist-name {
-  flex: 1;
-  font-size: 11px;
-  color: var(--cream);
-  font-family: 'Georgia', serif;
-  opacity: 0.8;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sp-playlist-count {
-  font-size: 8px;
-  color: var(--amber);
-  opacity: 0.35;
-  letter-spacing: 1px;
-  flex-shrink: 0;
-}
-
-/* ── Track rows ──────────────────────────────────────────── */
-.sp-track-list { padding: 4px 0; }
-
-.sp-track-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 20px;
-  cursor: pointer;
-  transition: background 0.12s ease;
-  border-radius: 2px;
-}
-
-.sp-track-row:hover {
-  background: rgba(255,200,80,0.06);
-}
-
-.sp-track-row.sp-no-preview {
-  cursor: default;
-  opacity: 0.35;
-}
-
-.sp-track-row.sp-selected {
-  background: rgba(29,185,84,0.08);
-}
-
-.sp-track-num {
-  font-size: 9px;
-  color: var(--amber);
-  opacity: 0.35;
-  letter-spacing: 1px;
-  font-family: 'Georgia', serif;
-  flex-shrink: 0;
-  width: 18px;
-}
-
-.sp-track-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.sp-track-name {
-  font-size: 11px;
-  color: var(--cream);
-  font-family: 'Georgia', serif;
-  opacity: 0.88;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  display: block;
-}
-
-.sp-track-artist {
-  font-size: 9px;
-  color: var(--amber);
-  opacity: 0.45;
-  letter-spacing: 0.5px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  display: block;
-}
-
-.sp-track-action {
-  font-size: 10px;
-  color: var(--amber);
-  opacity: 0.5;
-  flex-shrink: 0;
-  transition: opacity 0.12s, color 0.12s;
-}
-
-.sp-track-row:not(.sp-no-preview):hover .sp-track-action {
-  opacity: 1;
-  color: #1DB954;
-}
-
-/* ── Auth / Setup views ──────────────────────────────────── */
-.sp-auth-wrap {
-  padding: 28px 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  text-align: center;
-}
-
-.sp-label {
-  font-size: 9px;
-  letter-spacing: 2.5px;
-  color: var(--amber);
-  font-family: 'Georgia', serif;
-  text-transform: uppercase;
-  opacity: 0.7;
-  margin: 0;
-}
-
-.sp-sub {
-  font-size: 10px;
-  color: var(--cream);
-  font-family: 'Georgia', serif;
-  opacity: 0.45;
-  line-height: 1.6;
-  margin: 0;
-}
-
-.sp-sub code {
-  font-size: 9px;
-  color: var(--amber);
-  opacity: 0.8;
-  background: rgba(255,200,80,0.08);
-  padding: 2px 5px;
-  border-radius: 2px;
-  border: 1px solid rgba(200,150,50,0.2);
-}
-
-.sp-connect-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 11px 22px;
-  border-radius: 4px;
-  border: 1px solid rgba(29,185,84,0.35);
-  background: rgba(29,185,84,0.08);
-  color: #1DB954;
-  font-size: 9px;
-  letter-spacing: 2.5px;
-  font-family: 'Georgia', serif;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  margin-top: 8px;
-}
-
-.sp-connect-btn:hover {
-  background: rgba(29,185,84,0.15);
-  border-color: rgba(29,185,84,0.55);
-  box-shadow: 0 0 12px rgba(29,185,84,0.15);
-}
-
-.sp-connect-btn:active { transform: translateY(1px); }
-
-.sp-disclaimer {
-  font-size: 8px;
-  color: var(--cream);
-  opacity: 0.25;
-  letter-spacing: 0.5px;
-  font-family: 'Georgia', serif;
-  margin: 0;
-}
-
-.sp-setup-msg {
-  padding: 24px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  text-align: center;
-}
-
-.sp-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 32px 20px;
-  color: var(--amber);
-  font-size: 9px;
-  letter-spacing: 2px;
-  font-family: 'Georgia', serif;
-  opacity: 0.5;
-}
-
-.sp-spinner {
-  width: 12px; height: 12px;
-  border: 1.5px solid rgba(200,145,58,0.3);
-  border-top-color: var(--amber);
-  border-radius: 50%;
-  animation: sp-spin 0.8s linear infinite;
-}
-
-@keyframes sp-spin {
-  to { transform: rotate(360deg); }
-}
-
-.sp-empty {
-  padding: 16px 20px;
-  font-size: 10px;
-  color: var(--cream);
-  opacity: 0.3;
-  font-family: 'Georgia', serif;
-  text-align: center;
-}
-
-/* ── Mobile: panel goes full-width ──────────────────────── */
-@media (max-width: 520px) {
-  #spotify-panel {
-    width: 100%;
-    top: auto;
-    bottom: 0;
-    height: 70vh;
-    transform: translateY(100%);
-    border-radius: 16px 16px 0 0;
+/* ── Tablet / narrow desktop (≤ 780px) ─────────────────── */
+@media (max-width: 780px) {
+  :root {
+    --plinth-w:     min(95vw, 580px);
+    --plinth-h:     calc(var(--plinth-w) * 0.76);
+    --platter-size: calc(var(--plinth-w) * 0.50);
+    --record-size:  calc(var(--plinth-w) * 0.47);
   }
-  #spotify-panel.sp-open { transform: translateY(0); }
-  #sp-panel-inner { border-left: none; border-top: 1px solid rgba(180,130,50,0.18); }
-  #spotify-toggle { top: 20px; left: 16px; }
+
+  #tonearm-assembly {
+    right: calc(var(--plinth-w) * 0.04);
+    width: calc(var(--plinth-w) * 0.27);
+  }
+
+  #arm-tube { width: calc(var(--plinth-w) * 0.20); }
+
+  #upload-slot { bottom: 18px; left: 20px; width: 170px; }
+  #camera-toggle { bottom: 18px; right: 18px; }
+}
+
+/* ── Standard phone (≤ 520px) ───────────────────────────── */
+@media (max-width: 520px) {
+  :root {
+    --plinth-w:     min(98vw, 480px);
+    --plinth-h:     calc(var(--plinth-w) * 0.82);
+    --platter-size: calc(var(--plinth-w) * 0.52);
+    --record-size:  calc(var(--plinth-w) * 0.49);
+  }
+
+  #tonearm-assembly {
+    right: calc(var(--plinth-w) * 0.04);
+    top: 12%;
+    width: calc(var(--plinth-w) * 0.26);
+    height: calc(var(--plinth-h) * 0.55);
+  }
+
+  #tonearm-pivot {
+    top: 10px;
+    right: 8px;
+    width: 28px; height: 28px;
+  }
+
+  #arm-tube {
+    width: calc(var(--plinth-w) * 0.21);
+    height: 8px;
+    margin-top: -4px;
+  }
+
+  #counterweight { width: 16px; height: 20px; }
+
+  #headshell {
+    width: 22px; height: 14px;
+    left: -17px;
+  }
+
+  #center-label { width: 72px; height: 72px; }
+  #label-title  { font-size: 7px; }
+  #label-track  { font-size: 6px; max-width: 60px; }
+
+  #upload-slot   { bottom: 14px; left: 14px; width: 148px; }
+  #upload-text   { font-size: 8px; letter-spacing: 1.5px; }
+  #camera-toggle { bottom: 14px; right: 14px; font-size: 8px; letter-spacing: 1.5px; }
+
+  #hint { font-size: 9px; }
+}
+
+/* ── Small phone (≤ 380px — e.g. iPhone SE, 320px width) ── */
+@media (max-width: 380px) {
+  :root {
+    --plinth-w:     98vw;
+    --plinth-h:     calc(var(--plinth-w) * 0.88);
+    --platter-size: calc(var(--plinth-w) * 0.53);
+    --record-size:  calc(var(--plinth-w) * 0.50);
+  }
+
+  #tonearm-assembly {
+    right: calc(var(--plinth-w) * 0.03);
+    top: 10%;
+    width: calc(var(--plinth-w) * 0.24);
+    height: calc(var(--plinth-h) * 0.52);
+  }
+
+  #arm-tube { width: calc(var(--plinth-w) * 0.19); height: 7px; margin-top: -3.5px; }
+
+  #headshell { width: 18px; height: 12px; left: -14px; }
+
+  #tonearm-pivot { width: 24px; height: 24px; }
+
+  #center-label { width: 62px; height: 62px; }
+
+  #upload-slot   { bottom: 10px; left: 10px; width: 130px; }
+  #upload-text   { font-size: 7px; letter-spacing: 1px; }
+  #camera-toggle { bottom: 10px; right: 10px; font-size: 7px; letter-spacing: 1px; padding: 6px 10px; }
+
+  #hint { font-size: 8px; bottom: 16px; }
 }
